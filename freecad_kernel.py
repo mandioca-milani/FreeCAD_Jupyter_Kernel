@@ -15,28 +15,30 @@ class FreeCADKernel (Kernel):
     }
 
     tdir: tempfile.TemporaryDirectory
-    tfile: tempfile._TemporaryFileWrapper
+    tfile: list[tempfile._TemporaryFileWrapper] = list()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
         subprocess.run([
             '/usr/bin/nohup', '/usr/bin/bash', '-c',
-            '/usr/bin/freecad --single-instance --log-file ./FreeCAD.log &>./nohup.log &'
+            # '/usr/bin/freecad --single-instance --log-file ./FreeCAD.log &>./nohup.log &',
+            '/usr/bin/freecad --single-instance &>./dev/null &',
         ])
 
         self.tdir = tempfile.TemporaryDirectory(prefix='FreeCADJupyterKernel')
-        self.tfile = tempfile.NamedTemporaryFile('wt', suffix='.py', dir=self.tdir.name)
 
     def do_execute(self, code, silent, store_history=True, user_expressions=None, allow_stdin=False, *, cell_id=None):
-        self.tfile.truncate(0)
-        self.tfile.write(code)
-        self.tfile.seek(0)
+        self.tfile.append(tempfile.NamedTemporaryFile('wt', suffix='.py', dir=self.tdir.name))
+
+        tfile = self.tfile[-1]
+        tfile.write(code)
+        tfile.seek(0)
 
         subprocess.run([
             '/usr/bin/nohup', '/usr/bin/bash', '-c',
             '/usr/bin/freecad --single-instance {file1} &>/dev/null &'
-            .format(file1=self.tfile.name)
+            .format(file1=tfile.name)
         ])
 
         return {
